@@ -260,6 +260,8 @@ button {
 
 .card__media {
   position: relative;
+  display: block;
+  overflow: hidden;
   aspect-ratio: 4 / 5;
   background: var(--border);
 }
@@ -272,7 +274,7 @@ button {
 
 .badge {
   position: absolute;
-  top: 12px;
+  bottom: 12px;
   left: 12px;
   display: inline-flex;
   align-items: center;
