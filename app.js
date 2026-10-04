@@ -1,233 +1,189 @@
 (function () {
   'use strict';
 
-  var CATEGORIES = ['Все', 'Аватарки', 'Товары', 'Обложки', 'Логотипы', 'Пейзажи', 'Интерьеры', 'Видео'];
+  // Разметка страниц готовится скриптом build.js; здесь только поведение:
+  // копирование промпта, фильтры и поиск на главной, окно с промптом.
 
-  var state = {
-    prompts: [],
-    category: 'Все',
-    query: ''
-  };
+  // ---------- Копирование ----------
 
-  var els = {
-    filters: document.getElementById('filters'),
-    grid: document.getElementById('grid'),
-    status: document.getElementById('status'),
-    search: document.getElementById('search'),
-    modal: document.getElementById('modal'),
-    modalClose: document.getElementById('modal-close'),
-    modalImage: document.getElementById('modal-image'),
-    modalCategory: document.getElementById('modal-category'),
-    modalTitle: document.getElementById('modal-title'),
-    modalModel: document.getElementById('modal-model'),
-    modalRatio: document.getElementById('modal-ratio'),
-    modalPrompt: document.getElementById('modal-prompt'),
-    copyBtn: document.getElementById('copy-btn')
-  };
+  var COPY_LABEL = 'Скопировать промпт';
 
-  var lastFocused = null;
-  var copyTimer = null;
-
-  function text(value) {
-    return value == null ? '' : String(value).trim();
-  }
-
-  // Decap CMS сохраняет картинки с путём от корня сайта ("/images/x.png").
-  // Убираем ведущий слэш, чтобы путь работал и в подпапке (например, на GitHub Pages).
-  function imagePath(value) {
-    var path = text(value);
-    if (/^(https?:|data:)/i.test(path)) return path;
-    return path.replace(/^\/+/, '');
-  }
-
-  // Приводим запись к единому виду: в данных из админки поля могут быть пустыми или отсутствовать
-  function normalizePrompt(raw) {
-    raw = raw || {};
-    return {
-      id: text(raw.id),
-      title: text(raw.title) || 'Без названия',
-      category: text(raw.category),
-      type: text(raw.type) === 'video' ? 'video' : 'image',
-      model: text(raw.model),
-      ratio: text(raw.ratio),
-      prompt: text(raw.prompt),
-      image: imagePath(raw.image)
-    };
-  }
-
-  function renderFilters() {
-    els.filters.innerHTML = '';
-    CATEGORIES.forEach(function (name) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'filter';
-      btn.textContent = name;
-      btn.setAttribute('aria-pressed', String(name === state.category));
-      btn.addEventListener('click', function () {
-        state.category = name;
-        renderFilters();
-        renderGrid();
-        els.filters.children[CATEGORIES.indexOf(name)].focus();
-      });
-      els.filters.appendChild(btn);
-    });
-  }
-
-  function matches(item) {
-    if (state.category !== 'Все' && item.category !== state.category) return false;
-    if (!state.query) return true;
-    var haystack = [item.title, item.category, item.model, item.prompt].join(' ').toLowerCase();
-    return haystack.indexOf(state.query) !== -1;
-  }
-
-  function renderGrid() {
-    var items = state.prompts.filter(matches);
-    els.grid.innerHTML = '';
-
-    items.forEach(function (item) {
-      var li = document.createElement('li');
-      var card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'card';
-      card.setAttribute('aria-label', [item.title, item.category, item.model]
-        .filter(Boolean).join(', ') + (item.type === 'video' ? ', видео' : '') + '. Открыть промпт');
-
-      var media = document.createElement('span');
-      media.className = 'card__media';
-      if (item.image) {
-        var img = document.createElement('img');
-        img.src = item.image;
-        img.alt = '';
-        img.loading = 'lazy';
-        media.appendChild(img);
-      }
-
-      if (item.type === 'video') {
-        var badge = document.createElement('span');
-        badge.className = 'badge';
-        badge.innerHTML = '<svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></svg>Видео';
-        media.appendChild(badge);
-      }
-
-      var body = document.createElement('span');
-      body.className = 'card__body';
-      var title = document.createElement('span');
-      title.className = 'card__title';
-      title.textContent = item.title;
-      var meta = document.createElement('span');
-      meta.className = 'card__meta';
-      var cat = document.createElement('span');
-      cat.textContent = item.category;
-      var model = document.createElement('span');
-      model.textContent = item.model;
-      meta.appendChild(cat);
-      meta.appendChild(model);
-      body.appendChild(title);
-      body.appendChild(meta);
-
-      card.appendChild(media);
-      card.appendChild(body);
-      card.addEventListener('click', function () { openModal(item); });
-
-      li.appendChild(card);
-      els.grid.appendChild(li);
-    });
-
-    els.status.textContent = items.length
-      ? 'Найдено промптов: ' + items.length
-      : 'Ничего не найдено. Попробуйте другой запрос или категорию.';
-  }
-
-  function openModal(item) {
-    lastFocused = document.activeElement;
-    els.modalImage.hidden = !item.image;
-    if (item.image) els.modalImage.src = item.image;
-    else els.modalImage.removeAttribute('src');
-    els.modalImage.alt = 'Пример результата: ' + item.title;
-    els.modalCategory.textContent = item.type === 'video'
-      ? [item.category, 'видео'].filter(Boolean).join(' · ')
-      : item.category;
-    els.modalTitle.textContent = item.title;
-    els.modalModel.textContent = item.model || '—';
-    els.modalRatio.textContent = item.ratio || '—';
-    els.modalPrompt.textContent = item.prompt;
-    resetCopyButton();
-    els.modal.showModal();
-    els.copyBtn.focus();
-  }
-
-  function closeModal() {
-    if (els.modal.open) els.modal.close();
-  }
-
-  function resetCopyButton() {
-    clearTimeout(copyTimer);
-    els.copyBtn.textContent = 'Скопировать промпт';
-    els.copyBtn.classList.remove('is-done');
-  }
-
-  function fallbackCopy(text) {
+  function fallbackCopy(text, container) {
     var area = document.createElement('textarea');
     area.value = text;
     area.setAttribute('readonly', '');
     area.style.position = 'fixed';
     area.style.opacity = '0';
-    els.modal.appendChild(area);
+    container.appendChild(area);
     area.select();
     var ok = false;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-    els.modal.removeChild(area);
+    container.removeChild(area);
     return ok ? Promise.resolve() : Promise.reject(new Error('copy failed'));
   }
 
-  function copyText(text) {
+  function copyText(text, container) {
     if (navigator.clipboard && window.isSecureContext) {
-      return navigator.clipboard.writeText(text).catch(function () { return fallbackCopy(text); });
+      return navigator.clipboard.writeText(text).catch(function () { return fallbackCopy(text, container); });
     }
-    return fallbackCopy(text);
+    return fallbackCopy(text, container);
   }
 
-  els.copyBtn.addEventListener('click', function () {
-    copyText(els.modalPrompt.textContent).then(function () {
-      els.copyBtn.textContent = 'Скопировано';
-      els.copyBtn.classList.add('is-done');
-      copyTimer = setTimeout(resetCopyButton, 2000);
+  function resetCopyButton(btn) {
+    clearTimeout(btn._copyTimer);
+    btn.textContent = COPY_LABEL;
+    btn.classList.remove('is-done');
+  }
+
+  function showCopyResult(btn, label, done) {
+    btn.textContent = label;
+    btn.classList.toggle('is-done', done);
+    btn._copyTimer = setTimeout(function () { resetCopyButton(btn); }, 2000);
+  }
+
+  // Кнопка с data-copy="id" копирует текст элемента с этим id
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('button[data-copy]');
+    if (!btn) return;
+    var source = document.getElementById(btn.getAttribute('data-copy'));
+    if (!source) return;
+    clearTimeout(btn._copyTimer);
+    // Внутри открытого <dialog> вспомогательное поле должно лежать в нём самом
+    var container = btn.closest('dialog') || document.body;
+    copyText(source.textContent, container).then(function () {
+      showCopyResult(btn, 'Скопировано', true);
     }, function () {
-      els.copyBtn.textContent = 'Не удалось скопировать';
-      copyTimer = setTimeout(resetCopyButton, 2000);
+      showCopyResult(btn, 'Не удалось скопировать', false);
     });
   });
 
-  els.modalClose.addEventListener('click', closeModal);
+  // ---------- Фильтры и поиск (главная) ----------
 
-  // Клик по затемнённому фону вокруг окна
-  els.modal.addEventListener('click', function (e) {
-    if (e.target === els.modal) closeModal();
-  });
+  function initCatalog() {
+    var grid = document.getElementById('grid');
+    var filters = document.getElementById('filters');
+    var search = document.getElementById('search');
+    var status = document.getElementById('status');
+    if (!grid || !filters) return;
 
-  // Esc закрывает <dialog> сам; здесь возвращаем фокус на карточку
-  els.modal.addEventListener('close', function () {
-    if (lastFocused) lastFocused.focus();
-  });
+    var items = Array.prototype.slice.call(grid.children);
+    var category = 'Все';
+    var query = '';
 
-  els.search.addEventListener('input', function () {
-    state.query = els.search.value.trim().toLowerCase();
-    renderGrid();
-  });
+    function apply() {
+      var count = 0;
+      items.forEach(function (li) {
+        var visible = (category === 'Все' || li.getAttribute('data-category') === category) &&
+          (!query || (li.getAttribute('data-search') || '').indexOf(query) !== -1);
+        li.hidden = !visible;
+        if (visible) count++;
+      });
+      if (status) {
+        status.textContent = count
+          ? 'Найдено промптов: ' + count
+          : 'Ничего не найдено. Попробуйте другой запрос или категорию.';
+      }
+    }
 
-  renderFilters();
-
-  fetch('data/prompts.json')
-    .then(function (res) {
-      if (!res.ok) throw new Error(res.status);
-      return res.json();
-    })
-    .then(function (data) {
-      var list = Array.isArray(data) ? data : (data && data.prompts);
-      state.prompts = (Array.isArray(list) ? list : []).map(normalizePrompt);
-      renderGrid();
-    })
-    .catch(function () {
-      els.status.textContent = 'Не удалось загрузить промпты. Откройте сайт через локальный сервер (см. README).';
+    filters.addEventListener('click', function (e) {
+      var btn = e.target.closest('button[data-category]');
+      if (!btn) return;
+      category = btn.getAttribute('data-category');
+      Array.prototype.forEach.call(filters.querySelectorAll('button[data-category]'), function (b) {
+        b.setAttribute('aria-pressed', String(b === btn));
+      });
+      apply();
     });
+
+    if (search) {
+      search.addEventListener('input', function () {
+        query = search.value.trim().toLowerCase();
+        apply();
+      });
+      // Браузер может восстановить текст поиска при возврате на страницу
+      if (search.value) {
+        query = search.value.trim().toLowerCase();
+        apply();
+      }
+    }
+  }
+
+  // ---------- Окно с промптом (главная и категории) ----------
+
+  function initModal() {
+    var modal = document.getElementById('modal');
+    var dataEl = document.getElementById('prompts-data');
+    // Без поддержки <dialog> карточки остаются обычными ссылками на страницы промптов
+    if (!modal || !dataEl || typeof modal.showModal !== 'function') return;
+
+    var byId = {};
+    try {
+      JSON.parse(dataEl.textContent).forEach(function (item) { byId[item.id] = item; });
+    } catch (e) {
+      return;
+    }
+
+    var els = {
+      close: document.getElementById('modal-close'),
+      image: document.getElementById('modal-image'),
+      category: document.getElementById('modal-category'),
+      title: document.getElementById('modal-title'),
+      model: document.getElementById('modal-model'),
+      ratio: document.getElementById('modal-ratio'),
+      prompt: document.getElementById('modal-prompt'),
+      copy: document.getElementById('modal-copy'),
+      link: document.getElementById('modal-link')
+    };
+    var lastFocused = null;
+
+    function open(item, trigger) {
+      lastFocused = trigger;
+      els.image.hidden = !item.image;
+      if (item.image) {
+        els.image.src = item.image;
+        els.image.alt = (item.type === 'video' ? 'Кадр из видео: ' : 'Пример изображения: ') + item.title;
+      } else {
+        els.image.removeAttribute('src');
+        els.image.alt = '';
+      }
+      var isVideoCategory = (item.category || '').toLowerCase() === 'видео';
+      els.category.textContent = item.type === 'video' && !isVideoCategory
+        ? [item.category, 'видео'].filter(Boolean).join(' · ')
+        : item.category;
+      els.title.textContent = item.title;
+      els.model.textContent = item.model || '—';
+      els.ratio.textContent = item.ratio || '—';
+      els.prompt.textContent = item.prompt;
+      els.link.href = item.url;
+      resetCopyButton(els.copy);
+      modal.showModal();
+      els.copy.focus();
+    }
+
+    // Обычный клик по карточке открывает окно; с Ctrl/Cmd/Shift или средней кнопкой — страницу промпта
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var link = e.target.closest('a.card[data-id]');
+      if (!link) return;
+      var item = byId[link.getAttribute('data-id')];
+      if (!item) return;
+      e.preventDefault();
+      open(item, link);
+    });
+
+    els.close.addEventListener('click', function () { modal.close(); });
+
+    // Клик по затемнённому фону вокруг окна
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) modal.close();
+    });
+
+    // Esc закрывает <dialog> сам; здесь возвращаем фокус на карточку
+    modal.addEventListener('close', function () {
+      if (lastFocused) lastFocused.focus();
+    });
+  }
+
+  initCatalog();
+  initModal();
 })();

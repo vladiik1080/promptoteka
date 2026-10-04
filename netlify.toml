@@ -1,0 +1,13 @@
+# Настройки Netlify: сборка сайта и папка с готовыми файлами
+[build]
+  command = "node build.js"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Админка не должна попадать в поисковую выдачу
+[[headers]]
+  for = "/admin/*"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
