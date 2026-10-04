@@ -2,7 +2,7 @@
   "prompts": [
     {
       "id": "avatar-watercolor",
-      "title": "Акварельный портрет для аватарки",
+      "title": "Акварельный портрет для авы",
       "category": "Аватарки",
       "type": "image",
       "model": "Midjourney",
