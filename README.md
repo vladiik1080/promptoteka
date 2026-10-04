@@ -18,3 +18,11 @@ python3 -m http.server 8000
 - `index.html`, `style.css`, `app.js` — сам сайт
 - `data/prompts.json` — все промпты (поля: `id`, `title`, `category`, `type`: `image`|`video`, `model`, `ratio`, `prompt`, `image`)
 - `images/` — картинки примеров
+
+## Админка (Decap CMS)
+
+- `admin/index.html` — страница админки, открывается по адресу `/admin/` на сайте.
+- `admin/config.yml` — настройки: репозиторий `vladiik1080/promptoteka`, ветка `main`, коллекция «Промпты» редактирует `data/prompts.json`.
+- Загруженные картинки сохраняются в `images/`, в JSON записывается путь вида `/images/имя.png`. Сайт сам убирает ведущий `/`, поэтому пути работают и в подпапке (например, на GitHub Pages).
+- Список категорий задан в двух местах: `admin/config.yml` (поле «Категория») и `app.js` (`CATEGORIES`). Новую категорию добавляйте в оба файла.
+- Вход через GitHub требует OAuth-сервиса (например, хостинга на Netlify). Без него страница админки откроется, но войти не получится.

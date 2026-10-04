@@ -1,0 +1,65 @@
+# Настройки админки Decap CMS: https://decapcms.org/docs/configuration-options/
+backend:
+  name: github
+  repo: vladiik1080/promptoteka
+  branch: main
+  commit_messages:
+    update: "Обновить промпты ({{path}})"
+    uploadMedia: "Загрузить картинку {{path}}"
+    deleteMedia: "Удалить картинку {{path}}"
+
+locale: ru
+
+# Куда сохраняются загруженные картинки и какой путь записывается в prompts.json
+media_folder: images
+public_folder: /images
+
+collections:
+  - name: prompts
+    label: Промпты
+    files:
+      - name: prompts
+        label: Промпты
+        file: data/prompts.json
+        format: json
+        fields:
+          - name: prompts
+            label: Промпты
+            label_singular: промпт
+            widget: list
+            summary: "{{fields.title}} — {{fields.category}}"
+            fields:
+              - name: id
+                label: ID
+                widget: string
+                hint: "Уникальное короткое имя латиницей, без пробелов: маленькие буквы, цифры и дефис. Например: logo-coffee"
+                pattern: ['^[a-z0-9]+(-[a-z0-9]+)*$', "Только маленькие латинские буквы, цифры и дефис, например: logo-coffee"]
+              - name: title
+                label: Название
+                widget: string
+              - name: category
+                label: Категория
+                widget: select
+                options: ["Аватарки", "Товары", "Обложки", "Логотипы", "Пейзажи", "Интерьеры", "Видео"]
+              - name: type
+                label: Тип
+                widget: select
+                default: image
+                options:
+                  - { label: "Изображение", value: "image" }
+                  - { label: "Видео", value: "video" }
+              - name: model
+                label: Нейросеть
+                widget: string
+                hint: "Например: Midjourney, DALL·E 3, Sora"
+              - name: ratio
+                label: Формат
+                widget: string
+                hint: "Соотношение сторон, например: 1:1, 4:5, 16:9"
+              - name: prompt
+                label: Текст промпта
+                widget: text
+              - name: image
+                label: Картинка
+                widget: image
+                hint: "Пример результата. На сайте показывается в карточке 4:5"

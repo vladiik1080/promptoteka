@@ -28,6 +28,33 @@
   var lastFocused = null;
   var copyTimer = null;
 
+  function text(value) {
+    return value == null ? '' : String(value).trim();
+  }
+
+  // Decap CMS сохраняет картинки с путём от корня сайта ("/images/x.png").
+  // Убираем ведущий слэш, чтобы путь работал и в подпапке (например, на GitHub Pages).
+  function imagePath(value) {
+    var path = text(value);
+    if (/^(https?:|data:)/i.test(path)) return path;
+    return path.replace(/^\/+/, '');
+  }
+
+  // Приводим запись к единому виду: в данных из админки поля могут быть пустыми или отсутствовать
+  function normalizePrompt(raw) {
+    raw = raw || {};
+    return {
+      id: text(raw.id),
+      title: text(raw.title) || 'Без названия',
+      category: text(raw.category),
+      type: text(raw.type) === 'video' ? 'video' : 'image',
+      model: text(raw.model),
+      ratio: text(raw.ratio),
+      prompt: text(raw.prompt),
+      image: imagePath(raw.image)
+    };
+  }
+
   function renderFilters() {
     els.filters.innerHTML = '';
     CATEGORIES.forEach(function (name) {
@@ -62,16 +89,18 @@
       var card = document.createElement('button');
       card.type = 'button';
       card.className = 'card';
-      card.setAttribute('aria-label', item.title + ', ' + item.category + ', ' + item.model +
-        (item.type === 'video' ? ', видео' : '') + '. Открыть промпт');
+      card.setAttribute('aria-label', [item.title, item.category, item.model]
+        .filter(Boolean).join(', ') + (item.type === 'video' ? ', видео' : '') + '. Открыть промпт');
 
       var media = document.createElement('span');
       media.className = 'card__media';
-      var img = document.createElement('img');
-      img.src = item.image;
-      img.alt = '';
-      img.loading = 'lazy';
-      media.appendChild(img);
+      if (item.image) {
+        var img = document.createElement('img');
+        img.src = item.image;
+        img.alt = '';
+        img.loading = 'lazy';
+        media.appendChild(img);
+      }
 
       if (item.type === 'video') {
         var badge = document.createElement('span');
@@ -111,12 +140,16 @@
 
   function openModal(item) {
     lastFocused = document.activeElement;
-    els.modalImage.src = item.image;
+    els.modalImage.hidden = !item.image;
+    if (item.image) els.modalImage.src = item.image;
+    else els.modalImage.removeAttribute('src');
     els.modalImage.alt = 'Пример результата: ' + item.title;
-    els.modalCategory.textContent = item.type === 'video' ? item.category + ' · видео' : item.category;
+    els.modalCategory.textContent = item.type === 'video'
+      ? [item.category, 'видео'].filter(Boolean).join(' · ')
+      : item.category;
     els.modalTitle.textContent = item.title;
-    els.modalModel.textContent = item.model;
-    els.modalRatio.textContent = item.ratio;
+    els.modalModel.textContent = item.model || '—';
+    els.modalRatio.textContent = item.ratio || '—';
     els.modalPrompt.textContent = item.prompt;
     resetCopyButton();
     els.modal.showModal();
@@ -190,7 +223,8 @@
       return res.json();
     })
     .then(function (data) {
-      state.prompts = data.prompts || [];
+      var list = Array.isArray(data) ? data : (data && data.prompts);
+      state.prompts = (Array.isArray(list) ? list : []).map(normalizePrompt);
       renderGrid();
     })
     .catch(function () {
