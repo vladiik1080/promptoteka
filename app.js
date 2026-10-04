@@ -67,13 +67,13 @@
     if (!grid || !filters) return;
 
     var items = Array.prototype.slice.call(grid.children);
-    var category = 'Все';
+    var category = '*';
     var query = '';
 
     function apply() {
       var count = 0;
       items.forEach(function (li) {
-        var visible = (category === 'Все' || li.getAttribute('data-category') === category) &&
+        var visible = (category === '*' || li.getAttribute('data-category') === category) &&
           (!query || (li.getAttribute('data-search') || '').indexOf(query) !== -1);
         li.hidden = !visible;
         if (visible) count++;
@@ -146,10 +146,9 @@
         els.image.removeAttribute('src');
         els.image.alt = '';
       }
-      var isVideoCategory = (item.category || '').toLowerCase() === 'видео';
-      els.category.textContent = item.type === 'video' && !isVideoCategory
-        ? [item.category, 'видео'].filter(Boolean).join(' · ')
-        : item.category;
+      // Подпись категории (с пометкой «видео», если нужно) готовит build.js
+      els.category.textContent = item.category;
+      els.category.hidden = !item.category;
       els.title.textContent = item.title;
       els.model.textContent = item.model || '—';
       els.ratio.textContent = item.ratio || '—';

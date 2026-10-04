@@ -90,17 +90,29 @@ function countPrompts(n) {
 
 // ---------- Данные ----------
 
-const categories = (readJson('data/categories.json').categories || []).map((c) => ({
-  name: text(c.name),
-  slug: text(c.slug),
-  title: text(c.title) || 'Промпты: ' + text(c.name),
-  description: text(c.description)
-}));
-const categoryByName = new Map(categories.map((c) => [c.name, c]));
-
-categories.forEach((c) => {
-  if (!ID_PATTERN.test(c.slug)) fail(`у категории «${c.name}» slug «${c.slug}» — нужны маленькие латинские буквы, цифры и дефис`);
+// Ошибки в категориях не останавливают сборку: такая категория пропускается,
+// а её промпты показываются без категории
+const categories = [];
+const categoryById = new Map();
+(readJson('data/categories.json').categories || []).forEach((raw, i) => {
+  raw = raw || {};
+  const c = {
+    id: text(raw.id),
+    name: text(raw.name),
+    description: text(raw.description),
+    // Без порядка категория встаёт в конец списка
+    order: raw.order === '' || raw.order == null || !Number.isFinite(Number(raw.order)) ? Infinity : Number(raw.order)
+  };
+  const where = `категория №${i + 1} («${c.name || c.id}»)`;
+  if (!ID_PATTERN.test(c.id)) return warn(`${where}: id «${c.id}» — нужны маленькие латинские буквы, цифры и дефис; категория пропущена`);
+  if (categoryById.has(c.id)) return warn(`${where}: id «${c.id}» уже есть у другой категории; категория пропущена`);
+  if (!c.name) c.name = c.id;
+  c.heading = `${c.name}: готовые промпты`;
+  c.metaDescription = c.description || `Готовые промпты в категории «${c.name}» для Midjourney, DALL·E, Stable Diffusion и других нейросетей.`;
+  categories.push(c);
+  categoryById.set(c.id, c);
 });
+categories.sort((a, b) => (a.order - b.order) || a.name.localeCompare(b.name, 'ru'));
 
 const rawData = readJson('data/prompts.json');
 const rawList = Array.isArray(rawData) ? rawData : rawData && rawData.prompts;
@@ -111,7 +123,7 @@ const prompts = rawList.map((raw) => {
   return {
     id: text(raw.id),
     title: text(raw.title) || 'Без названия',
-    category: text(raw.category),
+    categoryId: text(raw.category),
     type: text(raw.type) === 'video' ? 'video' : 'image',
     model: text(raw.model),
     ratio: text(raw.ratio),
@@ -127,25 +139,31 @@ prompts.forEach((p, i) => {
   if (!ID_PATTERN.test(p.id)) fail(`${where}: id «${p.id}» — нужны маленькие латинские буквы, цифры и дефис`);
   if (seenIds.has(p.id)) fail(`${where}: id «${p.id}» уже есть у другого промпта`);
   seenIds.add(p.id);
-  p.cat = categoryByName.get(p.category) || null;
-  if (!p.cat) warn(`${where}: категории «${p.category}» нет в data/categories.json, страница категории для неё не создаётся`);
+  p.cat = categoryById.get(p.categoryId) || null;
+  // Название для посетителей; у промпта без категории — пустая строка
+  p.category = p.cat ? p.cat.name : '';
+  if (!p.categoryId) warn(`${where}: не указана категория, промпт показан без категории`);
+  else if (!p.cat) warn(`${where}: категории «${p.categoryId}» нет в data/categories.json, промпт показан без категории`);
   if (p.image.startsWith('/') && !fs.existsSync(path.join(ROOT, p.image))) warn(`${where}: файл ${p.image} не найден`);
 });
 
-const promptsByCategory = new Map(categories.map((c) => [c.name, prompts.filter((p) => p.category === c.name)]));
-const usedCategories = categories.filter((c) => promptsByCategory.get(c.name).length > 0);
+const promptsByCategory = new Map(categories.map((c) => [c.id, prompts.filter((p) => p.cat === c)]));
+// Категории без промптов не попадают ни в фильтры, ни на сайт
+const usedCategories = categories.filter((c) => promptsByCategory.get(c.id).length > 0);
 
 function promptPath(p) {
   return `/prompt/${p.id}/`;
 }
 
 function categoryPath(c) {
-  return `/category/${c.slug}/`;
+  return `/category/${c.id}/`;
 }
 
-// Пометка «видео» рядом с категорией, если сама категория не «Видео»
-function needsVideoMark(p) {
-  return p.type === 'video' && p.category.toLowerCase() !== 'видео';
+// Подпись категории с пометкой «видео», если сама категория не про видео
+function categoryLabel(p) {
+  const isVideoCategory = p.cat && (p.cat.id === 'video' || p.cat.name.toLowerCase() === 'видео');
+  if (p.type !== 'video' || isVideoCategory) return p.category;
+  return [p.category, 'видео'].filter(Boolean).join(' · ');
 }
 
 function altText(p) {
@@ -163,7 +181,7 @@ function card(p, index, headingLevel) {
     ? `<img src="${esc(p.image)}" alt="${esc(altText(p))}" width="400" height="500"${index >= 4 ? ' loading="lazy"' : ''}>`
     : '';
   const meta = [p.category, p.model].filter(Boolean).map((m) => `<span>${esc(m)}</span>`).join('');
-  return `<li data-category="${esc(p.category)}" data-search="${esc(search)}">
+  return `<li data-category="${p.cat ? p.cat.id : ''}" data-search="${esc(search)}">
           <a class="card" href="${promptPath(p)}" data-id="${esc(p.id)}">
             <div class="card__media">${img}${p.type === 'video' ? VIDEO_BADGE : ''}</div>
             <div class="card__body">
@@ -213,7 +231,7 @@ function modal(list) {
   const data = list.map((p) => ({
     id: p.id,
     title: p.title,
-    category: p.category,
+    category: categoryLabel(p),
     type: p.type,
     model: p.model,
     ratio: p.ratio,
@@ -299,7 +317,7 @@ function layout(page) {
   <footer class="footer">
     <div class="container">
       <nav class="footer__nav" aria-label="Категории промптов">
-        ${usedCategories.map((c) => `<a href="${categoryPath(c)}">${esc(c.title)}</a>`).join('\n        ')}
+        ${usedCategories.map((c) => `<a href="${categoryPath(c)}">${esc(c.name)}</a>`).join('\n        ')}
       </nav>
       <p class="footer__copy">© ${SITE_NAME}</p>
     </div>
@@ -314,7 +332,8 @@ function layout(page) {
 // ---------- Страницы ----------
 
 function homePage() {
-  const filters = [{ label: 'Все', value: 'Все' }].concat(categories.map((c) => ({ label: c.name, value: c.name })));
+  // «*» не может совпасть с id категории: в id только латиница, цифры и дефис
+  const filters = [{ label: 'Все', value: '*' }].concat(usedCategories.map((c) => ({ label: c.name, value: c.id })));
   const body = `<section class="hero container">
       <h1 class="hero__title">${esc(HOME.h1)}</h1>
       <p class="hero__subtitle">${esc(HOME.subtitle)}</p>
@@ -352,27 +371,27 @@ function homePage() {
 }
 
 function categoryPage(c) {
-  const list = promptsByCategory.get(c.name);
+  const list = promptsByCategory.get(c.id);
   const crumbs = breadcrumbs([{ name: 'Главная', path: '/' }, { name: c.name, path: categoryPath(c) }]);
   const body = `${crumbs.html}
 
     <section class="page-head container">
-      <h1 class="page-head__title">${esc(c.title)}</h1>
-      <p class="page-head__text">${esc(c.description)}</p>
+      <h1 class="page-head__title">${esc(c.heading)}</h1>
+      <p class="page-head__text">${esc(c.metaDescription)}</p>
     </section>
 
-    <section class="catalog container" aria-label="${esc(c.title)}">
+    <section class="catalog container" aria-label="${esc(c.heading)}">
       ${categoryNav(c)}
       <p class="catalog__status">${countPrompts(list.length)} в категории</p>
       ${grid(list, 2, 'grid')}
     </section>`;
   return layout({
     path: categoryPath(c),
-    title: `${c.title} — ${countPrompts(list.length)} с примерами | ${SITE_NAME}`,
-    ogTitle: c.title,
-    description: truncate(`${c.description} ${countPrompts(list.length)} с примерами результата.`, 160),
+    title: `${c.name} — ${countPrompts(list.length)} для нейросетей | ${SITE_NAME}`,
+    ogTitle: c.heading,
+    description: truncate(`${c.metaDescription} ${countPrompts(list.length)} с примерами результата.`, 160),
     image: (list.find((p) => p.image) || {}).image,
-    imageAlt: c.title,
+    imageAlt: c.heading,
     jsonLd: crumbs.jsonLd,
     body,
     modal: modal(list)
@@ -386,7 +405,7 @@ function promptPage(p) {
   const crumbs = breadcrumbs(trail);
 
   const related = p.cat
-    ? promptsByCategory.get(p.cat.name).filter((r) => r !== p).slice(0, RELATED_LIMIT)
+    ? promptsByCategory.get(p.cat.id).filter((r) => r !== p).slice(0, RELATED_LIMIT)
     : [];
   const relatedHtml = related.length
     ? `
@@ -397,9 +416,9 @@ function promptPage(p) {
     </section>`
     : '';
 
-  const categoryLabel = p.cat
-    ? `<a href="${categoryPath(p.cat)}">${esc(p.category)}</a>`
-    : esc(p.category);
+  const categoryHtml = p.cat
+    ? `<a href="${categoryPath(p.cat)}">${esc(p.category)}</a>${p.type === 'video' && categoryLabel(p) !== p.category ? ' · видео' : ''}`
+    : esc(categoryLabel(p));
 
   const body = `${crumbs.html}
 
@@ -408,7 +427,7 @@ function promptPage(p) {
         ${p.image ? `<img src="${esc(p.image)}" alt="${esc(altText(p))}" width="400" height="500">` : ''}${p.type === 'video' ? VIDEO_BADGE : ''}
       </div>
       <div class="prompt__body">
-        <p class="prompt__category">${categoryLabel}${needsVideoMark(p) ? ' · видео' : ''}</p>
+        ${categoryHtml ? `<p class="prompt__category">${categoryHtml}</p>` : ''}
         <h1 class="prompt__title">${esc(p.title)}</h1>
         <dl class="modal__meta">
           <div><dt>Нейросеть</dt><dd>${esc(p.model) || '—'}</dd></div>
@@ -480,7 +499,7 @@ COPY_FILES.forEach((f) => fs.copyFileSync(path.join(ROOT, f), path.join(DIST, f)
 COPY_DIRS.forEach((d) => fs.cpSync(path.join(ROOT, d), path.join(DIST, d), { recursive: true }));
 
 write('index.html', homePage());
-usedCategories.forEach((c) => write(`category/${c.slug}/index.html`, categoryPage(c)));
+usedCategories.forEach((c) => write(`category/${c.id}/index.html`, categoryPage(c)));
 prompts.forEach((p) => write(`prompt/${p.id}/index.html`, promptPage(p)));
 write('404.html', notFoundPage());
 
@@ -490,4 +509,4 @@ const urls = ['/']
 write('sitemap.xml', sitemap(urls));
 write('robots.txt', robots());
 
-console.log(`Готово: ${prompts.length} промптов, ${usedCategories.length} категорий, ${urls.length} адресов в sitemap.xml → dist/ (адрес сайта: ${SITE_URL})`);
+console.log(`Готово: ${prompts.length} промптов, ${usedCategories.length} категорий с промптами, ${urls.length} адресов в sitemap.xml → dist/ (адрес сайта: ${SITE_URL})`);

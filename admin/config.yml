@@ -27,7 +27,7 @@ collections:
             label: Промпты
             label_singular: промпт
             widget: list
-            summary: "{{fields.title}} — {{fields.category}}"
+            summary: "{{fields.title}}"
             fields:
               - name: id
                 label: ID
@@ -37,10 +37,16 @@ collections:
               - name: title
                 label: Название
                 widget: string
+              # В промпте хранится id категории, поэтому переименование категории не ломает связь
               - name: category
                 label: Категория
-                widget: select
-                options: ["Аватарки", "Товары", "Обложки", "Логотипы", "Пейзажи", "Интерьеры", "Видео"]
+                widget: relation
+                collection: categories
+                file: categories
+                search_fields: ["categories.*.name"]
+                display_fields: ["categories.*.name"]
+                value_field: "categories.*.id"
+                hint: "Список берётся из раздела «Категории»"
               - name: type
                 label: Тип
                 widget: select
@@ -63,3 +69,37 @@ collections:
                 label: Картинка
                 widget: image
                 hint: "Пример результата. На сайте показывается в карточке 4:5"
+
+  - name: categories
+    label: Категории
+    files:
+      - name: categories
+        label: Категории
+        file: data/categories.json
+        format: json
+        fields:
+          - name: categories
+            label: Категории
+            label_singular: категорию
+            widget: list
+            summary: "{{fields.order}} · {{fields.name}}"
+            fields:
+              - name: id
+                label: ID
+                widget: string
+                hint: "Короткое имя латиницей для адреса страницы /category/<id>/: маленькие буквы, цифры и дефис. Например: logos. После публикации лучше не менять — у промптов этой категории и у страницы сменится адрес"
+                pattern: ['^[a-z0-9]+(-[a-z0-9]+)*$', "Только маленькие латинские буквы, цифры и дефис, например: logos"]
+              - name: name
+                label: Название
+                widget: string
+                hint: "То, что видят посетители: на кнопке-фильтре, в карточках и хлебных крошках"
+              - name: description
+                label: Описание
+                widget: text
+                hint: "1–2 предложения для страницы категории и описания в поисковиках (до 160 символов)"
+              - name: order
+                label: Порядок
+                widget: number
+                value_type: int
+                default: 100
+                hint: "Число для сортировки кнопок-фильтров: меньше — левее. Удобно шагом 10 (10, 20, 30), чтобы вставлять новые между ними"

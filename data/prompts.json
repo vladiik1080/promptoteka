@@ -3,7 +3,7 @@
     {
       "id": "avatar-watercolor",
       "title": "Акварельный портрет для авы",
-      "category": "Аватарки",
+      "category": "avatars",
       "type": "image",
       "model": "Midjourney",
       "ratio": "1:1",
@@ -13,7 +13,7 @@
     {
       "id": "product-cosmetics",
       "title": "Флакон косметики на подиуме",
-      "category": "Товары",
+      "category": "products",
       "type": "image",
       "model": "Midjourney",
       "ratio": "4:5",
@@ -23,7 +23,7 @@
     {
       "id": "cover-podcast",
       "title": "Обложка для подкаста",
-      "category": "Обложки",
+      "category": "covers",
       "type": "image",
       "model": "DALL·E 3",
       "ratio": "1:1",
@@ -33,7 +33,7 @@
     {
       "id": "logo-coffee",
       "title": "Минималистичный логотип кофейни",
-      "category": "Логотипы",
+      "category": "logos",
       "type": "image",
       "model": "Ideogram",
       "ratio": "1:1",
@@ -43,7 +43,7 @@
     {
       "id": "landscape-mountains",
       "title": "Горы на рассвете",
-      "category": "Пейзажи",
+      "category": "landscapes",
       "type": "image",
       "model": "Stable Diffusion XL",
       "ratio": "16:9",
@@ -53,7 +53,7 @@
     {
       "id": "interior-scandi",
       "title": "Скандинавская гостиная",
-      "category": "Интерьеры",
+      "category": "interiors",
       "type": "image",
       "model": "Midjourney",
       "ratio": "4:5",
@@ -63,7 +63,7 @@
     {
       "id": "video-ocean",
       "title": "Волны в замедленной съёмке",
-      "category": "Видео",
+      "category": "video",
       "type": "video",
       "model": "Sora",
       "ratio": "16:9",
@@ -73,7 +73,7 @@
     {
       "id": "video-city",
       "title": "Ночной город в таймлапсе",
-      "category": "Видео",
+      "category": "video",
       "type": "video",
       "model": "Runway Gen-3",
       "ratio": "9:16",
